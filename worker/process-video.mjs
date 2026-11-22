@@ -280,14 +280,16 @@ async function main() {
   const srtPath           = path.join(workDir, 'subtitles.srt');
   const renderedVideoPath = path.join(workDir, 'output.mp4');
 
+  // Hoisted so the error handler can persist whatever was produced before failing.
+  let srtContent = '';
+  let language   = 'en';
+  let seo        = null;
+
   try {
     // ── 1. Download raw video ────────────────────────────────────────────────
     await downloadFromSupabase(job.storage_path, rawVideoPath);
 
     // ── 2. Transcribe (Whisper) ──────────────────────────────────────────────
-    let srtContent = '';
-    let language   = 'en';
-
     if (job.auto_subtitle) {
       const result = await transcribe(rawVideoPath);
       srtContent   = result.srt;
@@ -297,7 +299,7 @@ async function main() {
     }
 
     // ── 3. Generate SEO metadata (GPT-4o-mini) ───────────────────────────────
-    const seo = await generateSEO(srtContent || '(no transcript)', language, job.aspect_ratio);
+    seo = await generateSEO(srtContent || '(no transcript)', language, job.aspect_ratio);
     console.log(`📌  Title: ${seo.title}`);
 
     // ── 4. Render with FFmpeg ────────────────────────────────────────────────
@@ -352,6 +354,12 @@ async function main() {
     await supabase.from('video_jobs').update({
       status:        'error',
       error_message: err instanceof Error ? err.message : String(err),
+      ...(seo ? {
+        yt_title:       seo.title,
+        yt_description: seo.description,
+        yt_tags:        seo.tags,
+      } : {}),
+      ...(srtContent ? { srt_content: srtContent } : {}),
     }).eq('id', jobId);
 
     process.exit(1);
