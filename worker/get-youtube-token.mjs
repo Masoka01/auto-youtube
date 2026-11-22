@@ -50,7 +50,7 @@ if (!clientId || !clientSecret) {
 
 // ── Loopback OAuth2 flow ──────────────────────────────────────────────────────
 const PORT = Number(process.env.OAUTH_PORT || 3005);
-const REDIRECT_URI = `http://127.0.0.1:${PORT}/oauth2callback`;
+const REDIRECT_URI = process.env.OAUTH_REDIRECT_URI || `http://127.0.0.1:${PORT}/oauth2callback`;
 
 const SCOPES = [
   'https://www.googleapis.com/auth/youtube.upload',
@@ -82,14 +82,15 @@ const opener = process.platform === 'darwin' ? 'open'
 exec(`${opener} "${authUrl}"`, () => {});
 
 const server = http.createServer(async (req, res) => {
-  if (!req.url || !req.url.startsWith('/oauth2callback')) {
+  // Accept the callback on any path — Desktop clients treat loopback URIs leniently.
+  const url = new URL(req.url || '/', REDIRECT_URI);
+  const err = url.searchParams.get('error');
+  const code = url.searchParams.get('code');
+
+  if (!err && !code) {
     res.writeHead(404).end('Not found');
     return;
   }
-
-  const url = new URL(req.url, REDIRECT_URI);
-  const err = url.searchParams.get('error');
-  const code = url.searchParams.get('code');
 
   if (err) {
     res.writeHead(400, { 'Content-Type': 'text/html' });

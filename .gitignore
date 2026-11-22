@@ -12,6 +12,7 @@ dist/
 # ── Environment & secrets (NEVER commit) ──────────────────────────────────────
 .env
 .env.*
+client_secret_*.json
 
 # ── Vercel ────────────────────────────────────────────────────────────────────
 .vercel/
